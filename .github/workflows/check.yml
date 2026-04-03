@@ -1,0 +1,44 @@
+name: Vérification des nominations en cabinet
+
+on:
+  schedule:
+    # Tous les jours à 8h00 et 14h00 (heure Paris = UTC+1/+2)
+    - cron: "0 7 * * *"
+    - cron: "0 13 * * *"
+  workflow_dispatch: # déclenchement manuel possible
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # nécessaire pour commiter seen_ids.json
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run bot
+        env:
+          PISTE_CLIENT_ID:     ${{ secrets.PISTE_CLIENT_ID }}
+          PISTE_CLIENT_SECRET: ${{ secrets.PISTE_CLIENT_SECRET }}
+          BLUESKY_HANDLE:      ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_PASSWORD:    ${{ secrets.BLUESKY_PASSWORD }}
+          TELEGRAM_BOT_TOKEN:  ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:    ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python main.py
+
+      - name: Commit seen_ids.json
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add seen_ids.json
+          git diff --cached --quiet || git commit -m "chore: mise à jour seen_ids [skip ci]"
+          git push
